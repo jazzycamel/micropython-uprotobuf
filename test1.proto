@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+package test1;
+
+message test1 {
+  required int32 a = 1;
+  required string b = 2;
+  required int64 c = 4;
+  required float d = 5;
+  required double e = 6;
+}

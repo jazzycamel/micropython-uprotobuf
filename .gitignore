@@ -99,3 +99,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+compile.sh
+*_upb2.py
