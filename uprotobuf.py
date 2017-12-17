@@ -4,16 +4,16 @@ except ImportError: import struct
 class UnknownTypeException(Exception): pass
 class ValueNotSetException(Exception): pass
 
-class WireType(object):
-    Invalid=-1
-    Varint=0
-    Bit64=1
-    Length=2
-    Bit32=5
-
-    @classmethod
+def enum(*sequential, **named):
     def isValid(cls, type):
-        return type in (cls.Varint, cls.Bit64, cls.Length, cls.Bit32)
+        return type in cls.reverse_mapping
+
+    enums=dict(((x,i) for i,x in enumerate(sequential)), **named)   
+    enums['reverse_mapping']=dict((value,key) for key,value in enums.items())
+    enums['isValid']=classmethod(isValid)
+    return type('Enum', (object,), enums)
+
+WireType=enum(Invalid=-1, Varint=0, Bit64=1, Length=2, Bit32=5)
 
 class VarType(object):
     def __init__(self, id=None, data=None, subType=-1):
@@ -46,16 +46,18 @@ class VarType(object):
     @staticmethod
     def decodeZigZag(n): return (n>>1)^-(n&1)
 
-class Varint(VarType):
-    Int32=1
-    Int64=2
-    UInt32=3
-    UInt64=4
-    SInt32=5
-    SInt64=6
-    Bool=7
-    Enum=8
+VarintSubType=enum(
+    Int32=1,
+    Int64=2,
+    UInt32=3,
+    UInt64=4,
+    SInt32=5,
+    SInt64=6,
+    Bool=7,
+    Enum=8,
+)
 
+class Varint(VarType):
     @staticmethod
     def type(): return WireType.Varint
 
@@ -67,12 +69,14 @@ class Varint(VarType):
         for i,d in enumerate(self._data):
             self._value|=(d&0x7f)<<(i*7)
 
-class Length(VarType):
-    String=1
-    Message=2
-    Group=3
-    Bytes=4
+LengthSubType=enum(
+    String=1,
+    Message=2,
+    Group=3,
+    Bytes=4,
+)
 
+class Length(VarType):
     @staticmethod
     def type(): return WireType.Length
 
@@ -80,23 +84,25 @@ class Length(VarType):
         if self._data==data: return
         self._data=data
 
-        if self._subType==self.String: self._value=self._data.decode('utf8')
+        if self._subType==LengthSubType.String: self._value=self._data.decode('utf8')
+
+FixedSubType=enum(
+    Fixed64=1,
+    SignedFixed64=2,
+    Double=3,
+    Fixed32=4,
+    SignedFixed32=5,
+    Float=6,
+)
 
 class Fixed(VarType):
-    Fixed64=1
-    SignedFixed64=2
-    Double=3
-    Fixed32=4
-    SignedFixed32=5
-    Float=6
-
     def __init__(self, id=None, data=None, subType=-1):
         super().__init__(id,data,subType)
-        if subType==self.Float: self._fmt='<f'
-        elif subType==self.Double: self._fmt='<d'
+        if subType==FixedSubType.Float: self._fmt='<f'
+        elif subType==FixedSubType.Double: self._fmt='<d'
 
     def type(self):
-        if self._subType in (self.Fixed64, self.SignedFixed64, self.Double):
+        if self._subType in (FixedSubType.Fixed64, FixedSubType.SignedFixed64, FixedSubType.Double):
             return WireType.Bit64
         else: return WireType.Bit32
 
@@ -104,7 +110,7 @@ class Fixed(VarType):
         if self._data==data: return
         self._data=data
 
-        if self._subType in (self.Float,self.Double):
+        if self._subType in (FixedSubType.Float, FixedSubType.Double):
             self._value=self.decodeFloat(self._data, self._fmt)
 
     @staticmethod

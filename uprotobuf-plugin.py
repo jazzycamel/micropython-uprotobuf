@@ -4,6 +4,8 @@ import os.path as osp
 from google.protobuf.compiler import plugin_pb2 as plugin
 from google.protobuf.descriptor_pb2 import DescriptorProto, EnumDescriptorProto, FieldDescriptorProto as FProto
 
+from uprotobuf import enum
+
 def traverse(proto_file):
     def _traverse(package, items):
         for item in items:
@@ -23,62 +25,68 @@ def traverse(proto_file):
     )
 
 def getType(field_type):
-    if field_type==FProto.TYPE_BOOL: type="WireType.Varint"; subType="Varint.Bool"
-    elif field_type==FProto.TYPE_BYTES: type="WireType.Length"; subType="Length.Bytes"
-    elif field_type==FProto.TYPE_DOUBLE: type="WireType.Bit64"; subType="Fixed.Double"
-    elif field_type==FProto.TYPE_ENUM: type="WireType.Varint"; subType="Varint.Enum"
-    elif field_type==FProto.TYPE_FIXED32: type="WireType.Bit32"; subType="Fixed.Fixed32"
-    elif field_type==FProto.TYPE_FIXED64: type="WireType.Bit64"; subType="Fixed.Fixed64"
-    elif field_type==FProto.TYPE_FLOAT: type="WireType.Bit32"; subType="Fixed.Float"
-    elif field_type==FProto.TYPE_GROUP: type="WireType.Length"; subType="Length.Group"
-    elif field_type==FProto.TYPE_INT32: type="WireType.Varint"; subType="Varint.Int32"
-    elif field_type==FProto.TYPE_INT64: type="WireType.Varint"; subType="Varint.Int64"
-    elif field_type==FProto.TYPE_MESSAGE: type="WireType.Length"; subType="Length.Message"
-    elif field_type==FProto.TYPE_SFIXED32: type="WireType.Bit32"; subType="Fixed.SignedFixed32"
-    elif field_type==FProto.TYPE_SFIXED64: type="WireType.Bit64"; subType="Fixed.SignedFIxed64"
-    elif field_type==FProto.TYPE_SINT32: type="WireType.Varint"; subType="Varint.SInt32"
-    elif field_type==FProto.TYPE_SINT64: type="WireType.Varint"; subType="Varint.SInt64"
-    elif field_type==FProto.TYPE_STRING: type="WireType.Length"; subType="Length.String"
-    elif field_type==FProto.TYPE_UINT32: type="WireType.Varint"; subType="Varint.UInt32"
-    elif field_type==FProto.TYPE_UINT64: type="WireType.Varint"; subType="Varint.UInt64"
+    if field_type==FProto.TYPE_BOOL: type="WireType.Varint"; subType="VarintSubType.Bool"
+    elif field_type==FProto.TYPE_BYTES: type="WireType.Length"; subType="LengthSubType.Bytes"
+    elif field_type==FProto.TYPE_DOUBLE: type="WireType.Bit64"; subType="FixedSubType.Double"
+    elif field_type==FProto.TYPE_ENUM: type="WireType.Varint"; subType="VarintSubType.Enum"
+    elif field_type==FProto.TYPE_FIXED32: type="WireType.Bit32"; subType="FixedSubType.Fixed32"
+    elif field_type==FProto.TYPE_FIXED64: type="WireType.Bit64"; subType="FixedSubType.Fixed64"
+    elif field_type==FProto.TYPE_FLOAT: type="WireType.Bit32"; subType="FixedSubType.Float"
+    elif field_type==FProto.TYPE_GROUP: type="WireType.Length"; subType="LengthSubType.Group"
+    elif field_type==FProto.TYPE_INT32: type="WireType.Varint"; subType="VarintSubType.Int32"
+    elif field_type==FProto.TYPE_INT64: type="WireType.Varint"; subType="VarintSubType.Int64"
+    elif field_type==FProto.TYPE_MESSAGE: type="WireType.Length"; subType="LengthSubType.Message"
+    elif field_type==FProto.TYPE_SFIXED32: type="WireType.Bit32"; subType="FixedSubType.SignedFixed32"
+    elif field_type==FProto.TYPE_SFIXED64: type="WireType.Bit64"; subType="FixedSubType.SignedFIxed64"
+    elif field_type==FProto.TYPE_SINT32: type="WireType.Varint"; subType="VarintSubType.SInt32"
+    elif field_type==FProto.TYPE_SINT64: type="WireType.Varint"; subType="VarintSubType.SInt64"
+    elif field_type==FProto.TYPE_STRING: type="WireType.Length"; subType="LengthSubType.String"
+    elif field_type==FProto.TYPE_UINT32: type="WireType.Varint"; subType="VarintSubType.UInt32"
+    elif field_type==FProto.TYPE_UINT64: type="WireType.Varint"; subType="VarintSubType.UInt64"
     else: raise Exception()
     return type,subType
 
 def generateCode(request, response):
     for proto_file in request.proto_file:
-        output="from uprotobuf import Message, WireType, Varint, Fixed, Length\n\n"
+        output="from uprotobuf import *\n\n"
+
+        enums=""
+        fields=""
 
         for item,package in traverse(proto_file):
             if isinstance(item, DescriptorProto):
-                output+="class {}Message(Message):\n".format(item.name.capitalize())
-                output+="    _proto_fields=[\n"
+                fields+="\nclass {}Message(Message):\n".format(item.name.capitalize())
+                fields+="    _proto_fields=[\n"
 
                 for field in item.field:
 
+                    if field.type==FProto.TYPE_ENUM:
+                        fields+="\n# {}, {}\n".format(field.type, field.type_name)
                     type,subType=getType(field.type)
 
+
                     # Need to hance field.default_value and field.options and field.label (required/optional/repeated?)
-                    output+="        dict(name='{}', type={}, subType={}, id={}),\n".format(
+                    fields+="        dict(name='{}', type={}, subType={}, id={}),\n".format(
                         field.name,
                         type,
                         subType,
                         field.number
                     )
-                    output+="        # Label: {}, Default Value: {}, Options: {}\n".format(
+                    fields+="        # Label: {}, Default Value: {}, Options: {}\n".format(
                         field.label, # FProto.LABEL_OPTIONAL, FProto.LABEL_REPEATED, FProto.LABEL_REQUIRED
                         field.default_value,
-                        field.options
+                        field.options,
                     )
 
-                output+="    ]\n"
+                fields+="    ]\n"
 
             elif isinstance(item, EnumDescriptorProto):
-                # Need to write an Enum class for upy...
-                # '''class <item.name>(Enum):'''
-                #     for value in item.value:
-                #     '''<value.name>=<value.number>'''
-                pass
+                enums+="\n{}=enum(\n".format(item.name.capitalize())
+                for value in item.value:
+                    enums+='    {}={},\n'.format(value.name, value.number)
+                enums+=")\n"
 
+        output+=enums+fields
         f=response.file.add()
         f.name="{}_upb2.py".format(osp.splitext(proto_file.name)[0])
         f.content=output 

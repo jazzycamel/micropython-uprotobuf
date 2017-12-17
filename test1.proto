@@ -3,9 +3,16 @@ syntax = "proto2";
 package test1;
 
 message test1 {
+  enum test1enum {
+    ValueA=1;
+    ValueB=2;
+    ValueC=3;
+  }
+
   required int32 a = 1;
   required string b = 2;
   required int64 c = 4;
   required float d = 5;
   required double e = 6;
+  required test1enum f = 7;
 }
