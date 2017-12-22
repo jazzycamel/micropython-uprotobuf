@@ -14,13 +14,26 @@ def enum(*sequential, **named):
     return type('Enum', (object,), enums)
 
 WireType=enum(Invalid=-1, Varint=0, Bit64=1, Length=2, Bit32=5)
+FieldType=enum(Invalid=-1, Optional=1, Required=2, Repeated=3)
 
 class VarType(object):
-    def __init__(self, id=None, data=None, subType=-1):
+    def __init__(self, id=None, data=None, subType=-1, fieldType=-1, **kwargs):
         self._id=id
         self._data=data
-        self._value=None
+        self._value=[] if fieldType is FieldType.Repeated else None
         self._subType=subType
+        self._fieldType=fieldType
+
+    def reset(self):
+        self._data=None
+        self._value=[] if self._fieldType is FieldType.Repeated else None
+
+    def isValid(self):
+        if not self._fieldType==FieldType.Required: return True
+        return self._data!=None and self._value not in (None, [])
+
+    @property
+    def id(self): return self._id
 
     @staticmethod
     def type(): return WireType.Invalid
@@ -58,6 +71,12 @@ VarintSubType=enum(
 )
 
 class Varint(VarType):
+    def __init__(self, id=None, data=None, subType=-1, fieldType=-1, **kwargs):
+        super().__init__(id, data, subType, fieldType, **kwargs)
+
+        if subType==VarintSubType.Enum:
+            self._enum=kwargs['enum']
+
     @staticmethod
     def type(): return WireType.Varint
 
@@ -65,9 +84,25 @@ class Varint(VarType):
         if self._data==data: return
         self._data=data
 
-        self._value=0
+        value=0
         for i,d in enumerate(self._data):
-            self._value|=(d&0x7f)<<(i*7)
+            value|=(d&0x7f)<<(i*7)
+
+        if self._subType in (VarintSubType.SInt32, VarintSubType.SInt64):
+            value=self.decodeZigZag(value)
+        elif self._subType==VarintSubType.Bool:
+            value=bool(value)
+
+        if self._fieldType==FieldType.Repeated:
+            self._value.append(value)
+        else: self._value=value
+
+    def __repr__(self):
+        if self._subType!=VarintSubType.Enum:
+           return super().__repr__()
+
+        valueName=self._enum.reverse_mapping.get(self._value, None)
+        return "{}({}: {})".format(self.__class__.__name__, self._id, valueName)
 
 LengthSubType=enum(
     String=1,
@@ -84,7 +119,12 @@ class Length(VarType):
         if self._data==data: return
         self._data=data
 
-        if self._subType==LengthSubType.String: self._value=self._data.decode('utf8')
+        if self._subType==LengthSubType.String:
+            value=self._data.decode('utf8')
+
+        if self._fieldType==FieldType.Repeated:
+            self._value.append(value)
+        else: self._value=value
 
 FixedSubType=enum(
     Fixed64=1,
@@ -96,10 +136,12 @@ FixedSubType=enum(
 )
 
 class Fixed(VarType):
-    def __init__(self, id=None, data=None, subType=-1):
-        super().__init__(id,data,subType)
+    def __init__(self, id=None, data=None, subType=-1, fieldType=-1, **kwargs):
+        super().__init__(id,data,subType,fieldType,**kwargs)
         if subType==FixedSubType.Float: self._fmt='<f'
         elif subType==FixedSubType.Double: self._fmt='<d'
+        elif subType in (FixedSubType.Fixed32, FixedSubType.SignedFixed32): self._fmt="<i"
+        elif subType in (FixedSubType.Fixed64, FixedSubType.SignedFixed64): self._fmt="<q"
 
     def type(self):
         if self._subType in (FixedSubType.Fixed64, FixedSubType.SignedFixed64, FixedSubType.Double):
@@ -110,14 +152,16 @@ class Fixed(VarType):
         if self._data==data: return
         self._data=data
 
-        if self._subType in (FixedSubType.Float, FixedSubType.Double):
-            self._value=self.decodeFloat(self._data, self._fmt)
+        value=self.decodeFixed(self._data, self._fmt)
+        if self._fieldType==FieldType.Repeated:
+            self._value.append(value)
+        else: self._value=value
 
     @staticmethod
-    def encodeFloat(n, fmt='<f'): return struct.pack(fmt,n)
+    def encodeFixed(n, fmt='<f'): return struct.pack(fmt,n)
 
     @staticmethod
-    def decodeFloat(n, fmt='<f'): return struct.unpack(fmt,n)[0]
+    def decodeFixed(n, fmt='<f'): return struct.unpack(fmt,n)[0]
 
 class Message(object):
     def __init__(self):
@@ -131,7 +175,8 @@ class Message(object):
             else: raise UnknownTypeException
 
             self._fieldsLUT[field['id']]=field['name']
-            self._fields[field['name']]=clazz(id=field['id'], subType=field['subType'])
+            self._fields[field['name']]=clazz(**field)
+
         self.fields=self._fields
 
     def __getattr__(self, name):
@@ -147,6 +192,16 @@ class Message(object):
     def __iter__(self):
        return iter(self._fields.keys())
 
+    def reset(self):
+        for field in self.values(): field.reset()
+
+    def isValid(self):
+        for field in self.values():
+            if not field.isValid():
+                print("Field {} is not valid!".format(field.id))
+                return False
+        else: return True
+
     def keys(self): return self._fields.keys()
 
     def values(self): return self._fields.values()
@@ -154,6 +209,7 @@ class Message(object):
     def items(self): return self._fields.items()
 
     def parse(self, msg):
+        self.reset()
         i=0
         while i<len(msg):
             byte=msg[i]           
@@ -187,3 +243,4 @@ class Message(object):
 
             if name not in self._fields: continue
             self._fields[name].setData(data)
+        return self.isValid()

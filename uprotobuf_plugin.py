@@ -4,7 +4,7 @@ import os.path as osp
 from google.protobuf.compiler import plugin_pb2 as plugin
 from google.protobuf.descriptor_pb2 import DescriptorProto, EnumDescriptorProto, FieldDescriptorProto as FProto
 
-from uprotobuf import enum
+from uprotobuf import enum, FieldType
 
 def traverse(proto_file):
     def _traverse(package, items):
@@ -37,7 +37,7 @@ def getType(field_type):
     elif field_type==FProto.TYPE_INT64: type="WireType.Varint"; subType="VarintSubType.Int64"
     elif field_type==FProto.TYPE_MESSAGE: type="WireType.Length"; subType="LengthSubType.Message"
     elif field_type==FProto.TYPE_SFIXED32: type="WireType.Bit32"; subType="FixedSubType.SignedFixed32"
-    elif field_type==FProto.TYPE_SFIXED64: type="WireType.Bit64"; subType="FixedSubType.SignedFIxed64"
+    elif field_type==FProto.TYPE_SFIXED64: type="WireType.Bit64"; subType="FixedSubType.SignedFixed64"
     elif field_type==FProto.TYPE_SINT32: type="WireType.Varint"; subType="VarintSubType.SInt32"
     elif field_type==FProto.TYPE_SINT64: type="WireType.Varint"; subType="VarintSubType.SInt64"
     elif field_type==FProto.TYPE_STRING: type="WireType.Length"; subType="LengthSubType.String"
@@ -45,6 +45,11 @@ def getType(field_type):
     elif field_type==FProto.TYPE_UINT64: type="WireType.Varint"; subType="VarintSubType.UInt64"
     else: raise Exception()
     return type,subType
+
+def getFieldType(field_type):
+    assert FieldType.isValid(field_type)
+    name=FieldType.reverse_mapping[field_type]
+    return "FieldType.{}".format(name)
 
 def generateCode(request, response):
     for proto_file in request.proto_file:
@@ -59,24 +64,25 @@ def generateCode(request, response):
                 fields+="    _proto_fields=[\n"
 
                 for field in item.field:
-
-                    if field.type==FProto.TYPE_ENUM:
-                        fields+="\n# {}, {}\n".format(field.type, field.type_name)
                     type,subType=getType(field.type)
 
-
-                    # Need to hance field.default_value and field.options and field.label (required/optional/repeated?)
-                    fields+="        dict(name='{}', type={}, subType={}, id={}),\n".format(
+                    fields+="        dict(name='{}', type={}, subType={}, fieldType={}, id={}".format(
                         field.name,
                         type,
                         subType,
+                        getFieldType(field.label),
                         field.number
                     )
-                    fields+="        # Label: {}, Default Value: {}, Options: {}\n".format(
-                        field.label, # FProto.LABEL_OPTIONAL, FProto.LABEL_REPEATED, FProto.LABEL_REQUIRED
-                        field.default_value,
-                        field.options,
-                    )
+                    if field.type==FProto.TYPE_ENUM: 
+                        enum_name=field.type_name.split('.')[-1].capitalize()
+                        fields+=", enum={}".format(enum_name)
+                    fields+="),\n"
+
+                    # fields+="        # Label: {}, Default Value: {}, Options: {}\n".format(
+                    #     field.label, # FProto.LABEL_OPTIONAL, FProto.LABEL_REPEATED, FProto.LABEL_REQUIRED
+                    #     field.default_value,
+                    #     field.options,
+                    # )
 
                 fields+="    ]\n"
 
