@@ -1,4 +1,4 @@
-#!/home/rob/Development/protobuf/env/bin/python
+#!/usr/bin/env python
 from itertools import chain
 import os.path as osp
 from google.protobuf.compiler import plugin_pb2 as plugin
