@@ -4,6 +4,13 @@ except ImportError: import struct
 class UnknownTypeException(Exception): pass
 class ValueNotSetException(Exception): pass
 
+def partial(func, *args, **kwargs):
+    def _partial(*more_args, **more_kwargs):
+        kw = kwargs.copy()
+        kw.update(more_kwargs)
+        return func(*(args + more_args), **kw)
+    return _partial
+
 def enum(*sequential, **named):
     def isValid(cls, type):
         return type in cls.reverse_mapping
@@ -97,6 +104,18 @@ class Varint(VarType):
             self._value.append(value)
         else: self._value=value
 
+    def setValue(self, value):
+        if self._value==value: return
+        self._value=value
+
+        data=[(self._id<<3)|WireType.Varint]
+        if self._subType in (VarintSubType.Int32,):
+            v=self._value
+            data.append((v&0x7F)|0x80)
+            v=v>>7
+            data.append(v&0x7F)
+        self._data=bytes(data)
+
     def __repr__(self):
         if self._subType!=VarintSubType.Enum:
            return super().__repr__()
@@ -177,17 +196,20 @@ class Message(object):
             self._fieldsLUT[field['id']]=field['name']
             self._fields[field['name']]=clazz(**field)
 
+            name=field["name"]
+            print("Name",name)
+
+            setattr(self.__class__, field['name'], property(partial(self.__get,name), partial(self.__set,name)))
+
         self.fields=self._fields
 
-    def __getattr__(self, name):
-       return self.fields[name]
+    @staticmethod
+    def __get(name, instance):
+        return instance._fields[name]
 
-    def __setattr__(self, name, value):
-        if '_fields' in self.__dict__:
-            if name in self.__dict__['_fields']:
-                self.__dict__['_fields'][name].setValue(value)
-                return
-        super().__setattr__(name,value)
+    @staticmethod
+    def __set(name, instance, value):
+        instance._fields[name].setValue(value)
 
     def __iter__(self):
        return iter(self._fields.keys())
@@ -207,6 +229,12 @@ class Message(object):
     def values(self): return self._fields.values()
 
     def items(self): return self._fields.items()
+
+    def serialize(self):
+        data=b''
+        for name in self:
+            data+=self._fields[name].data()
+        return data
 
     def parse(self, msg):
         self.reset()

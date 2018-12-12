@@ -10,13 +10,13 @@ message test1 {
   }
 
   required int32 a = 1;
-  required string b = 2;
-  required int64 c = 4;
-  required float d = 5;
-  required double e = 6;
-  required test1enum f = 7 [default=ValueA];
-  optional bool g = 8;
-  repeated fixed32 h = 9;
-  required sint32 i = 10;
-  required sfixed64 j = 11;
+//  required string b = 2;
+//  required int64 c = 4;
+//  required float d = 5;
+//  required double e = 6;
+//  required test1enum f = 7 [default=ValueA];
+//  optional bool g = 8;
+//  repeated fixed32 h = 9;
+//  required sint32 i = 10;
+//  required sfixed64 j = 11;
 }
