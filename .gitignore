@@ -103,3 +103,4 @@ ENV/
 compile.sh
 *_upb2.py
 .idea/
+client.sh

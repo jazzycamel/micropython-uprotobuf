@@ -259,7 +259,8 @@ class Message(object):
 
     def serialize(self):
         data=b''
-        for name in self:
+        for i in range(1,1+len(self._fieldsLUT)):
+            name=self._fieldsLUT[i]
             d=self._fields[name].data()
             if d is not None: data+=d
         return data
