@@ -22,6 +22,14 @@ message Test1 {
 
   optional Test1Enum Enum = 8 [default=ValueA];
 
+  // Fixed types
+  optional fixed32 Fixed32 = 9;
+  optional fixed64 Fixed64 = 10;
+  optional sfixed32 Sfixed32 = 11;
+  optional sfixed64 Sfixed64 = 12;
+  optional float Float = 13;
+  optional double Double = 14;
+
 //  required int32 a = 1;
 //  required string b = 2;
 //  required int64 c = 4;

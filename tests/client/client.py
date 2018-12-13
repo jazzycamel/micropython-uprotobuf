@@ -12,7 +12,8 @@ if __name__=="__main__":
     #s.connect((HOST,PORT))
 
     t1m=Test1Message()
-    t1m.Enum=Test1enum.ValueB
+    #t1m.Enum=Test1enum.ValueB
+    t1m.Double=3.14
 
     print(t1m.serialize())
 

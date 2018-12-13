@@ -190,6 +190,13 @@ class Fixed(VarType):
             self._value.append(value)
         else: self._value=value
 
+    def setValue(self, value):
+        if self._value==value: return
+        self._value=value
+
+        data=bytes([(self._id<<3)|self.type()])
+        self._data=data+self.encodeFixed(value,self._fmt)
+
     @staticmethod
     def encodeFixed(n, fmt='<f'): return struct.pack(fmt,n)
 
