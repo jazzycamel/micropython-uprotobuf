@@ -159,6 +159,14 @@ class Length(VarType):
             self._value.append(value)
         else: self._value=value
 
+    def setValue(self, value):
+        if self._value==value: return
+        self._value=value
+
+        data=[(self._id<<3)|self.type()]
+        data.append(len(value))
+        self._data=bytes(data)+bytes(value, "utf8")
+
 FixedSubType=enum(
     Fixed64=1,
     SignedFixed64=2,

@@ -30,6 +30,9 @@ message Test1 {
   optional float Float = 13;
   optional double Double = 14;
 
+  // Lengths types
+  optional string String = 15;
+
 //  required int32 a = 1;
 //  required string b = 2;
 //  required int64 c = 4;

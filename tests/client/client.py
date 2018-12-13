@@ -13,7 +13,7 @@ if __name__=="__main__":
 
     t1m=Test1Message()
     #t1m.Enum=Test1enum.ValueB
-    t1m.Double=3.14
+    t1m.String="My hovercraft is full of eels!"
 
     print(t1m.serialize())
 
