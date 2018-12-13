@@ -5,8 +5,7 @@ This project is very much a work in progress and, as such, is incomplete. Curren
 via the plugin and messages can be parsed. 
 
 ### Things To Do
-* Implement Serialisation (most of the nuts and bolts are there)
-
+* Handle repeats and groups
 
 ## Usage
 It is assumed that Google Protobuf has been installed and the compiler (`protoc`) is on the `$PATH`. It is also assumed that
@@ -59,3 +58,23 @@ ok=message.parse("\x08\x96\x01")
 ```
 
 Note: this plugin was written for protobuf version 2. Version 3 has not been tested and may or may not work.
+
+## Client/Server Example
+In the `test` directory there are client and server scripts that demonstrate micropython encoding a message via
+micropython-uprotobuf, transmitting that message via TCP and then decoding the message via the standard Google
+protobuf python implementation.
+
+First, run the server as follows:
+```sh
+$ cd tests/server
+$ python3 server.py 
+```
+
+Then run the client as follows:
+```sh
+$ cd tests/client
+$ micropython client.py
+```
+
+Both server and client use a protocol specification that can be found in `tests/proto/tests.proto`. There is also a 
+script named `generate.sh` that is used to generate the python and micropython modules used by the example scripts.
