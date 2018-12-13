@@ -108,12 +108,26 @@ class Varint(VarType):
         if self._value==value: return
         self._value=value
 
+        if self._subType in (VarintSubType.SInt32, VarintSubType.SInt64):
+            value=self.encodeZigZag(value, 32 if self._subType==VarintSubType.SInt32 else 64)
+
         data=[(self._id<<3)|WireType.Varint]
-        if self._subType in (VarintSubType.Int32,):
-            v=self._value
-            data.append((v&0x7F)|0x80)
-            v=v>>7
-            data.append(v&0x7F)
+        if self._subType in (VarintSubType.Int32, VarintSubType.UInt32, VarintSubType.SInt32):
+            data.append((value&0x7F)|0x80)
+            value=value>>7
+            data.append(value&0x7F)
+
+        elif self._subType in (VarintSubType.Int64, VarintSubType.UInt64, VarintSubType.SInt64, VarintSubType.Enum):
+            for i in range(4):
+                data.append((value&0x7F))
+                value=value>>7
+                if value==0: break
+
+            for i in range(1,len(data)-1):
+               data[i]|=0x80
+        elif self._subType==VarintSubType.Bool:
+            data.append(int(value))
+
         self._data=bytes(data)
 
     def __repr__(self):
@@ -197,8 +211,6 @@ class Message(object):
             self._fields[field['name']]=clazz(**field)
 
             name=field["name"]
-            print("Name",name)
-
             setattr(self.__class__, field['name'], property(partial(self.__get,name), partial(self.__set,name)))
 
         self.fields=self._fields
@@ -233,7 +245,8 @@ class Message(object):
     def serialize(self):
         data=b''
         for name in self:
-            data+=self._fields[name].data()
+            d=self._fields[name].data()
+            if d is not None: data+=d
         return data
 
     def parse(self, msg):
