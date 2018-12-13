@@ -1,7 +1,7 @@
 # micropython-uprotobuf
 
 ## Project Status
-This project is very much a work in progress and as such is incomplete. Currently protocol specifications can be compiled
+This project is very much a work in progress and, as such, is incomplete. Currently protocol specifications can be compiled
 via the plugin and messages can be parsed. 
 
 ### Things To Do
@@ -14,7 +14,7 @@ a version of Python (preferably 3) is also available and the `protobuf` module h
 
 Assuming you have a protocol specification file available (in this case called `test1.proto`) containing something like the following:
 
-```
+```proto
 syntax = "proto2";
 
 package test1;
@@ -41,7 +41,7 @@ message test1 {
 
 then a micropython compatible module can be created using the uprotobuf plugin as follows: 
 
-```
+```sh
 $ git clone https://github.com/jazzycamel/micropython-uprotobuf.git
 $ cd micropython-uprotobuf
 $ chmod +x uprotobuf_plugin.py
@@ -51,7 +51,7 @@ $ protoc test1.proto --plugin=protoc-gen-custom=uprotobuf_plugin.py --custom_out
 This will generate a python module named `test1_upb2.py`, which can be imported and used by micropython, containing a
 class named `Test1Message`. This class can currently be used to parse binary messages as follows:
 
-```
+```python
 from test1_upb2 import Test1Message
 
 message=Test1Message()
