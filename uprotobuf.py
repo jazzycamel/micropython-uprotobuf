@@ -111,7 +111,12 @@ class Varint(VarType):
         if self._subType in (VarintSubType.SInt32, VarintSubType.SInt64):
             value=self.encodeZigZag(value, 32 if self._subType==VarintSubType.SInt32 else 64)
 
-        data=[(self._id<<3)|WireType.Varint]
+        data = []
+        field_id = (self._id<<3)|WireType.Varint
+        while field_id > 255:
+            data.insert(0, field_id & 0xff)
+            field_id >>= 8
+        data.insert(0, field_id)
         if self._subType in (VarintSubType.Int32, VarintSubType.UInt32, VarintSubType.SInt32):
             data.append((value&0x7F)|0x80)
             value=value>>7
@@ -259,10 +264,11 @@ class Message(object):
 
     def serialize(self):
         data=b''
-        for i in range(1,1+len(self._fieldsLUT)):
-            name=self._fieldsLUT[i]
-            d=self._fields[name].data()
-            if d is not None: data+=d
+        for i in range(1, max(self._fieldsLUT.keys())):
+            if i in self._fieldsLUT:
+                name=self._fieldsLUT[i]
+                d=self._fields[name].data()
+                if d is not None: data+=d
         return data
 
     def parse(self, msg):
