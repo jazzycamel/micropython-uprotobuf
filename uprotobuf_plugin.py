@@ -60,7 +60,7 @@ def generateCode(request, response):
 
         for item,package in traverse(proto_file):
             if isinstance(item, DescriptorProto):
-                fields+="\nclass {}Message(Message):\n".format(item.name.capitalize())
+                fields+="\n@registerMessage\nclass {}Message(Message):\n".format(item.name.capitalize())
                 fields+="    _proto_fields=[\n"
 
                 for field in item.field:
@@ -76,6 +76,8 @@ def generateCode(request, response):
                     if field.type==FProto.TYPE_ENUM: 
                         enum_name=field.type_name.split('.')[-1].capitalize()
                         fields+=", enum={}".format(enum_name)
+                    if field.type==FProto.TYPE_MESSAGE:
+                        fields+=", mType='{}'".format(field.type_name)
                     fields+="),\n"
 
                     # fields+="        # Label: {}, Default Value: {}, Options: {}\n".format(

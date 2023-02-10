@@ -46,6 +46,10 @@ $ cd micropython-uprotobuf
 $ chmod +x uprotobuf_plugin.py
 $ protoc test1.proto --plugin=protoc-gen-custom=uprotobuf_plugin.py --custom_out=. test1.proto
 ```
+Note: on Windows use
+```
+> protoc test1.proto --plugin=protoc-gen-custom=uprotobuf_plugin.bat --custom_out=. --proto_path=your\path\to\test1.proto test1.proto
+```
 
 This will generate a python module named `test1_upb2.py`, which can be imported and used by micropython, containing a
 class named `Test1Message`. This class can currently be used to parse binary messages as follows:

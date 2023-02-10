@@ -19,6 +19,28 @@ def enum(*sequential, **named):
     enums['reverse_mapping']=dict((value,key) for key,value in enums.items())
     enums['isValid']=classmethod(isValid)
     return type('Enum', (object,), enums)
+    
+_MessageRegister = {}
+def registerMessage(cls):
+    global _MessageRegister
+    _MessageRegister[".protobuf.{}".format(cls.__name__).lower()] = cls
+    return cls
+def getMessageType(name): 
+    global _MessageRegister
+    key = name+"Message"
+    key = key.lower()
+    return _MessageRegister[key]
+    
+def getBytesForId(_id, typ):
+    if _id < 0xF:return [(_id<<3)|typ]#we shouldnt get bigger than 0xFF (we shift left 3 bit => 0xF-> 0x78+typ => max 0x7F
+    else:
+        data =[]
+        value = (_id << 3) | typ
+        while value >= 0x7f:
+            data.append((value&0x7F)|0x80)
+            value=value>>7
+            data.append(value&0x7F)
+        return data
 
 WireType=enum(Invalid=-1, Varint=0, Bit64=1, Length=2, Bit32=5)
 FieldType=enum(Invalid=-1, Optional=1, Required=2, Repeated=3)
@@ -30,6 +52,7 @@ class VarType(object):
         self._value=[] if fieldType is FieldType.Repeated else None
         self._subType=subType
         self._fieldType=fieldType
+        self._mType = kwargs.get("mType","")
 
     def reset(self):
         self._data=None
@@ -111,7 +134,7 @@ class Varint(VarType):
         if self._subType in (VarintSubType.SInt32, VarintSubType.SInt64):
             value=self.encodeZigZag(value, 32 if self._subType==VarintSubType.SInt32 else 64)
 
-        data=[(self._id<<3)|WireType.Varint]
+        data=getBytesForId(self._id,WireType.Varint)
         if self._subType in (VarintSubType.Int32, VarintSubType.UInt32, VarintSubType.SInt32):
             data.append((value&0x7F)|0x80)
             value=value>>7
@@ -154,7 +177,13 @@ class Length(VarType):
 
         if self._subType==LengthSubType.String:
             value=self._data.decode('utf8')
-
+        elif self._subType== LengthSubType.Message:
+            if not hasattr(self, "_mType"): raise Exception("_mType not set")           
+            value = getMessageType(self._mType)()
+            value.parse(self._data)            
+        else: raise Error("Not implemented")
+        
+        
         if self._fieldType==FieldType.Repeated:
             self._value.append(value)
         else: self._value=value
@@ -163,9 +192,11 @@ class Length(VarType):
         if self._value==value: return
         self._value=value
 
-        data=[(self._id<<3)|self.type()]
+        data=getBytesForId(self._id, self.type())
         data.append(len(value))
-        self._data=bytes(data)+bytes(value, "utf8")
+        self._data=bytes(data)
+        if isinstance(value,bytes): self._data += value
+        else:self._data+= bytes(value, "utf8")
 
 FixedSubType=enum(
     Fixed64=1,
@@ -201,8 +232,8 @@ class Fixed(VarType):
     def setValue(self, value):
         if self._value==value: return
         self._value=value
-
-        data=bytes([(self._id<<3)|self.type()])
+        
+        data=bytes(getBytesForId(self._id,self.type()))
         self._data=data+self.encodeFixed(value,self._fmt)
 
     @staticmethod
@@ -211,6 +242,7 @@ class Fixed(VarType):
     @staticmethod
     def decodeFixed(n, fmt='<f'): return struct.unpack(fmt,n)[0]
 
+@registerMessage
 class Message(object):
     def __init__(self):
 
@@ -259,7 +291,7 @@ class Message(object):
 
     def serialize(self):
         data=b''
-        for i in range(1,1+len(self._fieldsLUT)):
+        for i in self._fieldsLUT.keys():
             name=self._fieldsLUT[i]
             d=self._fields[name].data()
             if d is not None: data+=d
@@ -274,8 +306,21 @@ class Message(object):
             if not WireType.isValid(type):
                 i+=1
                 continue
+            if byte <= 0x7f:#see https://github.com/nanopb/nanopb/blob/0f3dbba71d8d90b5ecfc1d01aed504c4ef642f80/pb_decode.c#L190
+                id=byte>>3#fast path, single byte
+            else:#varint
+                bitpos = 0
+                result =0
+                while byte & 0x80:
+                    result |= (byte&0x7F) << bitpos#result
+                    bitpos += 7
+                    i+=1
+                    byte = msg[i]
+                    if bitpos > 32:raise Exception("cant handle >32bit varint")
+                result |= ((byte&0x7F) << bitpos)#result
+                type=result&0x7
+                id=result>>3
 
-            id=byte>>3
             name=self._fieldsLUT[id]
             data=None
             if type==WireType.Varint:
